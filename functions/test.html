@@ -1,0 +1,20 @@
+<html>
+  <head>
+    <script>
+      fetch("https://us-central1-powerup-bot.cloudfunctions.net/helloWorld")
+      .then(response => {
+          if (response.ok) {
+            return response.json(); // Parse the response data as JSON
+          } else {
+            throw new Error('API request failed');
+          }
+      })
+      .then(json => {
+        console.log(json);
+      });
+    </script>
+  </head>
+  <body>
+    CORS test
+  </body>
+</html>
