@@ -25,7 +25,8 @@
     "firebase-functions": "^4.6.0",
     "firestore-jest-mock": "^0.23.0",
     "morgan-body": "^2.6.9",
-    "telegraf": "^4.15.3"
+    "telegraf": "^4.15.3",
+    "xstate": "^5.6.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
