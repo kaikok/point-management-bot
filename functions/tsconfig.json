@@ -1,6 +1,8 @@
 {
   "exclude": ["coverage/**/*", "./lib", "jest.config.js", "jest.e2e.config.js"],
   "compilerOptions": {
+    "strictNullChecks": true,
+    "skipLibCheck": true,
     "esModuleInterop": true,
     "module": "commonjs",
     "noImplicitReturns": true,
