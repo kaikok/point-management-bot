@@ -14,6 +14,9 @@ import {dbSeed} from "./data-seed";
 import {middlewareInterceptor, outgoingInterceptor}
   from "./interceptor";
 
+import {createActor,
+  Actor, AnyActorLogic} from "xstate";
+import {setupStateMachine} from "./interaction";
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -252,6 +255,44 @@ if (!process.env.YOURTOKEN) {
   const middleware = middlewareInterceptor();
   bot.use(middleware);
 
+  const eventViewingMachine = setupStateMachine(bot, removeKeyboard);
+
+  const hydrateActor = async (
+    userId: number,
+    user: admin.firestore.DocumentData):
+      Promise<Actor<AnyActorLogic>> => {
+    let userActor;
+    if (user.xstateContext==="") {
+      userActor = createActor(eventViewingMachine, {
+        input: {
+          userId: userId,
+        },
+      }).start();
+      const cleanState = userActor.getPersistedSnapshot();
+      await updateDoc(
+        firestore, `users/${userId}`,
+        {xstateContext: JSON.stringify(cleanState)});
+    } else {
+      const restoredState = JSON.parse(user.xstateContext);
+      userActor = createActor(eventViewingMachine, {
+        snapshot: restoredState,
+        input: {
+          userId: userId,
+        },
+      }).start();
+    }
+    return userActor;
+  };
+
+  const persistCurrentUserActor = async (
+    userId: number,
+    userActor: Actor<AnyActorLogic>) => {
+    const newState = userActor.getPersistedSnapshot();
+    return await updateDoc(
+      firestore, `users/${userId}`,
+      {xstateContext: JSON.stringify(newState)});
+  };
+
   bot.hears("hi", (ctx) => {
     const message = `Hey there, it is ${(new Date()).toLocaleString()} now.`;
     ctx.reply(message, {reply_markup: removeKeyboard});
@@ -295,6 +336,25 @@ if (!process.env.YOURTOKEN) {
     const commandName = "redeem";
     const participants = ["playerA", "playerB"];
     await handlePointsUpdate(ctx, commandName, participants);
+  });
+
+  bot.command("events", async (ctx) => {
+    const userId = ctx.from.id;
+    const user = await getUser(firestore, userId);
+    if (!user.valid) return;
+    if (!isAdmin(user)) return;
+    const userActor = await hydrateActor(userId, user);
+    userActor.send({type: "restore"});
+    userActor.subscribe(async (state) => {
+      functions.logger.info(
+        state.value, state.context, {structuredData: true});
+      if (state.value["hydration"] === "persisted") {
+        return await persistCurrentUserActor(
+          state.context.userId,
+          userActor);
+      } return Promise.resolve();
+    });
+    userActor.send({type: "eventCommand"});
   });
 
   bot.on("text", async (ctx) => {
@@ -377,6 +437,18 @@ if (!process.env.YOURTOKEN) {
         return;
       }
       default: {
+        const userActor = await hydrateActor(userId, user);
+        userActor.send({type: "restore"});
+        userActor.subscribe(async (state) => {
+          functions.logger.info(
+            state.value, state.context, {structuredData: true});
+          if (state.value["hydration"] === "persisted") {
+            return await persistCurrentUserActor(
+              state.context.userId,
+              userActor);
+          } return Promise.resolve();
+        });
+        userActor.send({type: "receivedInput", input: ctx.message.text});
         return;
       }
       }

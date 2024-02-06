@@ -61,6 +61,7 @@ export const dbSeed = async (
   await setDoc(firestore, "users", "88888888",
     {
       context: "{}",
+      xstateContext: "",
       role: "admin",
       state: "idle",
       valid: true,
