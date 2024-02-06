@@ -13,8 +13,8 @@ jest.mock("../../src/interceptor", () => {
             const newCallApi: typeof ctx.telegram.callApi =
               async function newCallApi(
                 this: typeof ctx.telegram, method, payload, {signal} = {}) {
-                console.log("bot-reply-interceptor",
-                  method, payload, signal, {structuredData: true});
+                // console.log("bot-reply-interceptor",
+                //   method, payload, signal, {structuredData: true});
                 interceptedMessage(method, payload, signal);
                 return getMockResponse(method, payload, signal) as Promise<ReturnType<(...args: any) => any>>;
               };
@@ -36,9 +36,9 @@ jest.mock("../../src/interceptor", () => {
             method: M,
             payload: Opts<M>,
             {signal}: ApiClient.CallApiOptions = {}) {
-            console.log(
-              "bot-adhoc-call-interceptor-request",
-              method, payload, signal, {structuredData: true});
+            // console.log(
+            //   "bot-adhoc-call-interceptor-request",
+            //   method, payload, signal, {structuredData: true});
             interceptedMessage(method, payload, signal);
             return getMockResponse(method, payload, signal) as Promise<ReturnType<(...args: any) => any>>;
           }
