@@ -1,0 +1,4 @@
+{
+  "jest.jestCommandLine": "npm test -- --config=jest.e2e.config.js --coverage --detectOpenHandles",
+  "jest.rootPath": "./functions"
+}
