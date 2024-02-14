@@ -26,13 +26,11 @@ export function setupStateMachine(
             },
             returnQueryTypeKeyboard: {
               invoke: {
-                input: ({context}) => ({userId: context.userId}),
+                input: {},
                 src: "SendEventQueryTypeKboard",
                 onDone: [
                   {
-                    target: [
-                      "awaitEventQueryType",
-                      "#interact.hydration.persisted"],
+                    target: "awaitEventQueryType",
                     actions: {
                       type: "CheckDone",
                     },
@@ -40,7 +38,7 @@ export function setupStateMachine(
                 ],
                 onError: [
                   {
-                    target: ["awaitCommand", "#interact.hydration.persisted"],
+                    target: "awaitCommand",
                     actions: {
                       type: "CheckError",
                     },
@@ -58,7 +56,7 @@ export function setupStateMachine(
             },
             removeKeyboard: {
               invoke: {
-                input: ({context}) => ({userId: context.userId}),
+                input: {},
                 src: "SendEmptyKeyboard",
                 onDone: [
                   {
@@ -91,25 +89,16 @@ export function setupStateMachine(
       type: "parallel",
       types: {
         events: {} as
-          | { type: "eventCommand"; input: string }
-          | { type: "receivedInput"; input: string }
-          | { type: "restore"; input: string },
-        context: {} as {
-          userId: number;
-          conversationContext: string;
-        },
-        input: {} as {
-          userId: number;
-        },
+            | { type: "eventCommand" }
+            | { type: "receivedInput" }
+            | { type: "restore" },
       },
     },
     {
       actions: {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         CheckDone: function({context, event}, params) {
           console.log("Send keyboard done");
         },
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         CheckError: function({context, event}, params) {
           console.log("Send keyboard error");
         },
@@ -119,10 +108,10 @@ export function setupStateMachine(
           async ({
             input,
           }: {
-            input: {
-              userId: number;
-            };
-          }) => {
+              input: {
+                userId: number;
+              };
+            }) => {
             const builtinKeyboard = {
               resize_keyboard: true,
               one_time_keyboard: true,
@@ -139,19 +128,19 @@ export function setupStateMachine(
           async ({
             input,
           }: {
-            input: {
-              userId: number;
-            };
-          }) => {
+              input: {
+                userId: number;
+              };
+            }) => {
             return await bot.telegram.sendMessage(
               input.userId,
               "Back to initial state",
-              {reply_markup: removeKeyboard});
+              {reply_markup: removeKeyboard},
+            );
           },
         ),
       },
       guards: {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         isQueryToday: function({context, event}, params) {
           console.log("is it today?");
           console.log(event.input);
