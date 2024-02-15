@@ -1,29 +1,30 @@
 import * as admin from "firebase-admin";
-import {setDoc} from "./data-access";
+import {setDoc, setFirestore} from "./data-access";
 import {Timestamp} from "firebase-admin/firestore";
 
 
 export const dbSeed = async (
   firestore: admin.firestore.Firestore) => {
-  await setDoc(firestore, "participants", "playerA",
+  setFirestore(firestore);
+  await setDoc("participants", "playerA",
     {
       total: 0,
     });
-  await setDoc(firestore, "participants/playerA/events", "sampleEvent",
+  await setDoc("participants/playerA/events", "sampleEvent",
     {
       name: "Test Event",
       timestamp: Timestamp.now(),
     });
-  await setDoc(firestore, "participants", "playerB",
+  await setDoc("participants", "playerB",
     {
       total: 0,
     });
-  await setDoc(firestore, "participants/playerB/events", "sampleEvent",
+  await setDoc("participants/playerB/events", "sampleEvent",
     {
       name: "Test Event",
       timestamp: Timestamp.now(),
     });
-  await setDoc(firestore, "items", "demerit",
+  await setDoc("items", "demerit",
     {
       descriptions: [
         "not so good behavior",
@@ -34,7 +35,7 @@ export const dbSeed = async (
         -2,
       ],
     });
-  await setDoc(firestore, "items", "redemption",
+  await setDoc("items", "redemption",
     {
       descriptions: [
         "Big prize",
@@ -47,7 +48,7 @@ export const dbSeed = async (
         -3,
       ],
     });
-  await setDoc(firestore, "items", "score",
+  await setDoc("items", "score",
     {
       descriptions: [
         "run an errand",
@@ -58,7 +59,7 @@ export const dbSeed = async (
         2,
       ],
     });
-  await setDoc(firestore, "users", "88888888",
+  await setDoc("users", "88888888",
     {
       context: "{}",
       xstateContext: "",

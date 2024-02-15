@@ -8,7 +8,7 @@ import "dotenv/config";
 import {Telegraf, Context} from "telegraf";
 import {KeyboardButton, Message, ReplyKeyboardRemove, Update}
   from "telegraf/typings/core/types/typegram";
-import {addDoc, getData, updateDoc} from "./data-access";
+import {addDoc, getData, setFirestore, updateDoc} from "./data-access";
 import {dbReset} from "./data-reset";
 import {dbSeed} from "./data-seed";
 import {middlewareInterceptor, outgoingInterceptor}
@@ -25,6 +25,7 @@ if (admin.apps.length === 0) {
 }
 
 const firestore = admin.firestore();
+setFirestore(firestore);
 const app = express();
 app.use(bodyParser.json());
 app.use("/telegram", bodyParser.json());
@@ -58,7 +59,7 @@ const handlePointsUpdate = async (
     update_id: number;}>,
   commandName: string,
   participants: Array<string>): Promise<void> => {
-  const user = await getUser(firestore, ctx.from.id);
+  const user = await getUser(ctx.from.id);
   if (!user.valid) return;
   if (!isAdmin(user)) return;
 
@@ -82,7 +83,7 @@ const handlePointsUpdate = async (
   } else if (tokens.length === 2 ) {
     const name = tokens[1];
     const aggregate =
-      await getData(firestore,
+      await getData(
         `items/${cmdDocNameLookup[commandName]}`,
         {descriptions: [], values: []});
 
@@ -106,15 +107,15 @@ const handlePointsUpdate = async (
       idx + name.length + itemIdx.length + 2);
 
     const aggregate =
-      await getData(firestore, `items/${cmdDocNameLookup[commandName]}`,
+      await getData( `items/${cmdDocNameLookup[commandName]}`,
         {descriptions: [], values: []});
 
-    await addDoc(firestore, `participants/${name}/events`, {
+    await addDoc(`participants/${name}/events`, {
       type: `${cmdDocNameLookup[commandName]}`,
       name: itemName,
       item_id: itemIdx,
       timestamp: admin.firestore.Timestamp.now()});
-    await updateDoc(firestore, `participants/${name}`, {
+    await updateDoc(`participants/${name}`, {
       total: admin.firestore.FieldValue.
         increment(aggregate.values[parseInt(itemIdx)])});
     await ctx.reply(`Done! ${itemName}`, {reply_markup: removeKeyboard});
@@ -126,7 +127,7 @@ const handleItemsUpdate = async (
     message: Update.New & Update.NonChannel & Message.TextMessage;
     update_id: number;}>,
   itemClasses: Array<string>): Promise<void> => {
-  const user = await getUser(firestore, ctx.from.id);
+  const user = await getUser(ctx.from.id);
   if (!user.valid) return;
   if (!isAdmin(user)) return;
 
@@ -148,7 +149,7 @@ const handleItemsUpdate = async (
   } else if (tokens.length === 2 ) {
     const itemClass = tokens[1];
     const itemList =
-      await getData(firestore, `items/${itemClass}`,
+      await getData( `items/${itemClass}`,
         {descriptions: [], values: []});
 
     const builtinKeyboard = {
@@ -174,7 +175,7 @@ const handleItemsUpdate = async (
     const action = tokens[2];
     if (action === "Add") {
       await updateDoc(
-        firestore, `users/${ctx.from.id}`,
+        `users/${ctx.from.id}`,
         {
           state: "add item",
           context: `{"itemClass":"${itemClass}",`+
@@ -184,7 +185,7 @@ const handleItemsUpdate = async (
         {reply_markup: removeKeyboard});
     } else if (action === "Update") {
       const itemList =
-        await getData(firestore, `items/${itemClass}`,
+        await getData( `items/${itemClass}`,
           {descriptions: [], values: []});
 
       const builtinKeyboard = {
@@ -211,15 +212,14 @@ const handleItemsUpdate = async (
     if (action === "Add") {
       await ctx.reply("cancelled", {reply_markup: removeKeyboard});
     } else if (action === "Update") {
-      await updateDoc(
-        firestore, `users/${ctx.from.id}`,
+      await updateDoc(`users/${ctx.from.id}`,
         {
           state: "update item",
           context: `{"itemClass":"${itemClass}","itemIdx":${itemIdx}}`});
       await ctx.reply("What is the new value?", {reply_markup: removeKeyboard});
     } else {
       await updateDoc(
-        firestore, `users/${ctx.from.id}`,
+        `users/${ctx.from.id}`,
         {state: "idle", context: "{}"});
       await ctx.reply("cancelled", {reply_markup: removeKeyboard});
     }
@@ -259,8 +259,7 @@ if (!process.env.YOURTOKEN) {
         },
       }).start();
       const cleanState = userActor.getPersistedSnapshot();
-      await updateUserXStateContext(
-        firestore, userId, JSON.stringify(cleanState));
+      await updateUserXStateContext(userId, JSON.stringify(cleanState));
     } else {
       const restoredState = JSON.parse(xstateContext);
       userActor = createActor(eventViewingMachine, {
@@ -277,9 +276,9 @@ if (!process.env.YOURTOKEN) {
     userId: number,
     userActor: Actor<AnyActorLogic>) => {
     const newState = userActor.getPersistedSnapshot();
-    return await updateDoc(
-      firestore, `users/${userId}`,
-      {xstateContext: JSON.stringify(newState)});
+    return await updateUserXStateContext(
+      userId,
+      JSON.stringify(newState));
   };
 
   bot.hears("hi", (ctx) => {
@@ -298,9 +297,9 @@ if (!process.env.YOURTOKEN) {
 
   bot.command("points", async (ctx) => {
     const playerAPoints =
-      await getData(firestore, "participants/playerA", {total: 0});
+      await getData( "participants/playerA", {total: 0});
     const playerBPoints =
-      await getData(firestore, "participants/playerB", {total: 0});
+      await getData( "participants/playerB", {total: 0});
 
     let reply = "Participant : Score\n";
     reply = reply.concat(`playerA : ${playerAPoints.total}\n`);
@@ -329,7 +328,7 @@ if (!process.env.YOURTOKEN) {
 
   bot.command("events", async (ctx) => {
     const userId = ctx.from.id;
-    const user = await getUser(firestore, userId);
+    const user = await getUser(userId);
     if (!user.valid) return;
     if (!isAdmin(user)) return;
     const userActor = await hydrateActor(userId, user.xstateContext);
@@ -349,11 +348,8 @@ if (!process.env.YOURTOKEN) {
   bot.on("text", async (ctx) => {
     const userId = ctx.from.id;
     const user = await getData(
-      firestore,
       `users/${userId}`,
-      {
-        valid: false,
-      });
+      {valid: false});
 
     if (!user.valid) return;
 
@@ -362,7 +358,7 @@ if (!process.env.YOURTOKEN) {
       case "update item": {
         const context = JSON.parse(user.context);
         const itemList = await getData(
-          firestore, `items/${context.itemClass}`,
+          `items/${context.itemClass}`,
           {descriptions: [], values: []});
         if (itemList.descriptions.length === 0) {
           await ctx.reply(`No ${context.itemClass} items found.`,
@@ -373,11 +369,10 @@ if (!process.env.YOURTOKEN) {
         const newValue = parseInt(ctx.message.text);
         const newValuesList = itemList.values;
         newValuesList[context.itemIdx] = newValue;
-        await updateDoc(firestore,
+        await updateDoc(
           `items/${context.itemClass}`, {
             values: newValuesList, descriptions: itemList.descriptions});
         await updateDoc(
-          firestore,
           `users/${userId}`,
           {state: "idle", context: "{}"});
         await ctx.reply(
@@ -394,7 +389,6 @@ if (!process.env.YOURTOKEN) {
             `"currentField":"value","description":"${description}"}`;
 
           await updateDoc(
-            firestore,
             `users/${userId}`,
             {state: "add item", context: newContext});
           await ctx.reply(
@@ -402,21 +396,21 @@ if (!process.env.YOURTOKEN) {
             {reply_markup: removeKeyboard});
         } else if (context.currentField === "value") {
           const itemList = await getData(
-            firestore, `items/${context.itemClass}`,
+            `items/${context.itemClass}`,
             {descriptions: [], values: []});
           const itemValue = parseInt(ctx.message.text);
           const itemDescription = context.description;
 
           itemList.descriptions.push(itemDescription);
           itemList.values.push(itemValue);
-          await updateDoc(firestore,
+          await updateDoc(
             `items/${context.itemClass}`,
             {
               descriptions: itemList.descriptions,
               values: itemList.values,
             });
           await updateDoc(
-            firestore, `users/${ctx.from.id}`,
+            `users/${ctx.from.id}`,
             {state: "idle", context: "{}"});
           await ctx.reply(
             `Added new ${context.itemClass},`+

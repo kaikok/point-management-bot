@@ -1,13 +1,17 @@
 import * as admin from "firebase-admin";
 
+let dataAccessFirestore : admin.firestore.Firestore;
+
+export const setFirestore = (firestore: admin.firestore.Firestore) => {
+  dataAccessFirestore = firestore;
+};
 
 export const getData = async (
-  firestore: admin.firestore.Firestore,
   path: string,
   defaultData: admin.firestore.DocumentData):
     Promise<admin.firestore.DocumentData> => {
   let data: admin.firestore.DocumentData = defaultData;
-  const docRef = await firestore.doc(path).get();
+  const docRef = await dataAccessFirestore.doc(path).get();
   if (docRef !== undefined) {
     data = docRef.data() || defaultData;
   }
@@ -15,11 +19,10 @@ export const getData = async (
 };
 
 export const addDoc = async (
-  firestore: admin.firestore.Firestore,
   path: string,
   data: admin.firestore.DocumentData):
     Promise<admin.firestore.DocumentData> => {
-  const collectionRef = await firestore.collection(path);
+  const collectionRef = await dataAccessFirestore.collection(path);
   if (collectionRef === undefined) {
     throw new Error("Collection not found");
   }
@@ -27,12 +30,11 @@ export const addDoc = async (
 };
 
 export const setDoc = async (
-  firestore: admin.firestore.Firestore,
   path: string,
   docName: string,
   data: admin.firestore.DocumentData):
     Promise<admin.firestore.DocumentData> => {
-  const collectionRef = await firestore.collection(path);
+  const collectionRef = await dataAccessFirestore.collection(path);
   if (collectionRef === undefined) {
     throw new Error("Collection not found");
   }
@@ -40,18 +42,16 @@ export const setDoc = async (
 };
 
 export const updateDoc = async (
-  firestore: admin.firestore.Firestore,
   path: string,
   data: {[x: string]: unknown;}):
     Promise<admin.firestore.DocumentData> => {
-  const docRef = firestore.doc(path);
+  const docRef = dataAccessFirestore.doc(path);
   return await docRef.update(data);
 };
 
 export const deleteDoc = async (
-  firestore: admin.firestore.Firestore,
   path: string):
     Promise<admin.firestore.DocumentData> => {
-  const docRef = firestore.doc(path);
+  const docRef = dataAccessFirestore.doc(path);
   return await docRef.delete();
 };
