@@ -17,6 +17,8 @@ import {middlewareInterceptor, outgoingInterceptor}
 import {createActor,
   Actor, AnyActorLogic} from "xstate";
 import {setupStateMachine} from "./interaction";
+import {getUser, isAdmin, updateUserXStateContext} from "./user";
+
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -48,22 +50,6 @@ const cmdDocNameLookup : {[key: string]: string} = {
   "score": "score",
   "demerit": "demerit",
   "redeem": "redemption",
-};
-
-const getUser = async (
-  firestore: admin.firestore.Firestore,
-  userId: number): Promise<admin.firestore.DocumentData> => {
-  const user = await getData(
-    firestore,
-    `users/${userId}`,
-    {valid: false, role: "none"});
-  return user;
-};
-
-const isAdmin = (
-  user: admin.firestore.DocumentData): boolean => {
-  if (user.role === "admin") return true;
-  return false;
 };
 
 const handlePointsUpdate = async (
@@ -240,6 +226,15 @@ const handleItemsUpdate = async (
   }
 };
 
+const setupInterception = (bot: Telegraf<Context<Update>>) => {
+  const oldCallApi = bot.telegram.callApi.bind(bot.telegram);
+  const newCallApi = outgoingInterceptor(oldCallApi);
+  bot.telegram.callApi = newCallApi.bind(bot.telegram);
+
+  const middleware = middlewareInterceptor();
+  bot.use(middleware);
+};
+
 if (!process.env.YOURTOKEN) {
   functions.logger.info("YOURTOKEN is not defined.", {structuredData: true});
   telegramStatus = "YOURTOKEN is not defined.";
@@ -248,32 +243,26 @@ if (!process.env.YOURTOKEN) {
     telegram: {webhookReply: true},
   });
 
-  const oldCallApi = bot.telegram.callApi.bind(bot.telegram);
-  const newCallApi = outgoingInterceptor(oldCallApi);
-  bot.telegram.callApi = newCallApi.bind(bot.telegram);
-
-  const middleware = middlewareInterceptor();
-  bot.use(middleware);
+  setupInterception(bot);
 
   const eventViewingMachine = setupStateMachine(bot, removeKeyboard);
 
   const hydrateActor = async (
     userId: number,
-    user: admin.firestore.DocumentData):
+    xstateContext: string):
       Promise<Actor<AnyActorLogic>> => {
     let userActor;
-    if (user.xstateContext==="") {
+    if (xstateContext==="") {
       userActor = createActor(eventViewingMachine, {
         input: {
           userId: userId,
         },
       }).start();
       const cleanState = userActor.getPersistedSnapshot();
-      await updateDoc(
-        firestore, `users/${userId}`,
-        {xstateContext: JSON.stringify(cleanState)});
+      await updateUserXStateContext(
+        firestore, userId, JSON.stringify(cleanState));
     } else {
-      const restoredState = JSON.parse(user.xstateContext);
+      const restoredState = JSON.parse(xstateContext);
       userActor = createActor(eventViewingMachine, {
         snapshot: restoredState,
         input: {
@@ -343,7 +332,7 @@ if (!process.env.YOURTOKEN) {
     const user = await getUser(firestore, userId);
     if (!user.valid) return;
     if (!isAdmin(user)) return;
-    const userActor = await hydrateActor(userId, user);
+    const userActor = await hydrateActor(userId, user.xstateContext);
     userActor.send({type: "restore"});
     userActor.subscribe(async (state) => {
       functions.logger.info(
@@ -437,7 +426,7 @@ if (!process.env.YOURTOKEN) {
         return;
       }
       default: {
-        const userActor = await hydrateActor(userId, user);
+        const userActor = await hydrateActor(userId, user.xstateContext);
         userActor.send({type: "restore"});
         userActor.subscribe(async (state) => {
           functions.logger.info(
