@@ -14,10 +14,9 @@ import {dbSeed} from "./data-seed";
 import {middlewareInterceptor, outgoingInterceptor}
   from "./interceptor";
 
-import {createActor,
-  Actor, AnyActorLogic} from "xstate";
-import {setupStateMachine} from "./interaction";
-import {getUser, isAdmin, updateUserXStateContext} from "./user";
+import {setupStateMachine, hydrateActor, getPersistanceCallback}
+  from "./interaction";
+import {getUser, isAdmin} from "./user";
 
 
 if (admin.apps.length === 0) {
@@ -247,40 +246,6 @@ if (!process.env.YOURTOKEN) {
 
   const eventViewingMachine = setupStateMachine(bot, removeKeyboard);
 
-  const hydrateActor = async (
-    userId: number,
-    xstateContext: string):
-      Promise<Actor<AnyActorLogic>> => {
-    let userActor;
-    if (xstateContext==="") {
-      userActor = createActor(eventViewingMachine, {
-        input: {
-          userId: userId,
-        },
-      }).start();
-      const cleanState = userActor.getPersistedSnapshot();
-      await updateUserXStateContext(userId, JSON.stringify(cleanState));
-    } else {
-      const restoredState = JSON.parse(xstateContext);
-      userActor = createActor(eventViewingMachine, {
-        snapshot: restoredState,
-        input: {
-          userId: userId,
-        },
-      }).start();
-    }
-    return userActor;
-  };
-
-  const persistCurrentUserActor = async (
-    userId: number,
-    userActor: Actor<AnyActorLogic>) => {
-    const newState = userActor.getPersistedSnapshot();
-    return await updateUserXStateContext(
-      userId,
-      JSON.stringify(newState));
-  };
-
   bot.hears("hi", (ctx) => {
     const message = `Hey there, it is ${(new Date()).toLocaleString()} now.`;
     ctx.reply(message, {reply_markup: removeKeyboard});
@@ -331,17 +296,10 @@ if (!process.env.YOURTOKEN) {
     const user = await getUser(userId);
     if (!user.valid) return;
     if (!isAdmin(user)) return;
-    const userActor = await hydrateActor(userId, user.xstateContext);
+    const userActor = await hydrateActor(
+      userId, user.xstateContext, eventViewingMachine);
     userActor.send({type: "restore"});
-    userActor.subscribe(async (state) => {
-      functions.logger.info(
-        state.value, state.context, {structuredData: true});
-      if (state.value["hydration"] === "persisted") {
-        return await persistCurrentUserActor(
-          state.context.userId,
-          userActor);
-      } return Promise.resolve();
-    });
+    userActor.subscribe(getPersistanceCallback(userActor));
     userActor.send({type: "eventCommand"});
   });
 
@@ -420,17 +378,10 @@ if (!process.env.YOURTOKEN) {
         return;
       }
       default: {
-        const userActor = await hydrateActor(userId, user.xstateContext);
+        const userActor = await hydrateActor(
+          userId, user.xstateContext, eventViewingMachine);
         userActor.send({type: "restore"});
-        userActor.subscribe(async (state) => {
-          functions.logger.info(
-            state.value, state.context, {structuredData: true});
-          if (state.value["hydration"] === "persisted") {
-            return await persistCurrentUserActor(
-              state.context.userId,
-              userActor);
-          } return Promise.resolve();
-        });
+        userActor.subscribe(getPersistanceCallback(userActor));
         userActor.send({type: "receivedInput", input: ctx.message.text});
         return;
       }

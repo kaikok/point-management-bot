@@ -1,8 +1,11 @@
 /* eslint-disable require-jsdoc */
+import * as functions from "firebase-functions";
 import {Context, Telegraf} from "telegraf";
 import {Update, ReplyKeyboardRemove}
   from "telegraf/typings/core/types/typegram";
-import {createMachine, fromPromise} from "xstate";
+import {Actor, AnyActorLogic, createActor, createMachine, fromPromise}
+  from "xstate";
+import {updateUserXStateContext} from "./user";
 
 export function setupStateMachine(
   bot: Telegraf<Context<Update>>, removeKeyboard: ReplyKeyboardRemove) {
@@ -153,8 +156,8 @@ export function setupStateMachine(
       guards: {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         isQueryToday: function({context, event}, params) {
-          console.log("is it today?");
-          console.log(event.input);
+          functions.logger.info(
+            "is it today?", event.input, {structuredData: true});
           return event.input === "today";
         },
       },
@@ -164,6 +167,50 @@ export function setupStateMachine(
   return machine;
 }
 
+export const hydrateActor = async (
+  userId: number,
+  xstateContext: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stateMachine: any):
+    Promise<Actor<AnyActorLogic>> => {
+  let userActor;
+  if (xstateContext==="") {
+    userActor = createActor(stateMachine, {
+      input: {
+        userId: userId,
+      },
+    }).start();
+    const cleanState = userActor.getPersistedSnapshot();
+    await updateUserXStateContext(userId, JSON.stringify(cleanState));
+  } else {
+    const restoredState = JSON.parse(xstateContext);
+    userActor = createActor(stateMachine, {
+      snapshot: restoredState,
+      input: {
+        userId: userId,
+      },
+    }).start();
+  }
+  return userActor;
+};
+
+export function getPersistanceCallback(userActor: Actor<AnyActorLogic>):
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ((snapshot: any) => void) {
+  return async (state) => {
+    functions.logger.info(
+      state.value, state.context, {structuredData: true});
+    if (state.value["hydration"] === "persisted") {
+      const newState = userActor.getPersistedSnapshot();
+      return await updateUserXStateContext(
+        state.context.userId,
+        JSON.stringify(newState));
+    } return Promise.resolve();
+  };
+}
+
 module.exports = {
   setupStateMachine: setupStateMachine,
+  hydrateActor: hydrateActor,
+  getPersistanceCallback: getPersistanceCallback,
 };
