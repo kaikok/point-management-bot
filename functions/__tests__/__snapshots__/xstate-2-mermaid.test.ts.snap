@@ -1,0 +1,79 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Generate mermaid diagram get machine 1`] = `
+"stateDiagram-v2
+interact : interact
+state interact {
+  interact.conversation : conversation
+  state interact.conversation {
+    [*] --> interact.conversation.awaitCommand
+    interact.conversation.awaitCommand : awaitCommand
+    interact.conversation.awaitCommand --> interact.conversation.returnQueryTypeKeyboard : eventCommand
+    interact.conversation.returnQueryTypeKeyboard : returnQueryTypeKeyboard
+    interact.conversation.returnQueryTypeKeyboard --> interact.conversation.awaitEventQueryType : returnQueryTypeKeyboard.OnDone
+    interact.hydration.restored --> interact.hydration.persisted : returnQueryTypeKeyboard.OnDone
+    interact.conversation.returnQueryTypeKeyboard --> interact.conversation.awaitCommand : returnQueryTypeKeyboard.OnError
+    interact.hydration.restored --> interact.hydration.persisted : returnQueryTypeKeyboard.OnError
+    interact.conversation.awaitEventQueryType : awaitEventQueryType
+    interact.conversation.awaitEventQueryType --> interact.conversation.removeKeyboard : receivedInput/isQueryToday
+    interact.conversation.removeKeyboard : removeKeyboard
+    interact.conversation.removeKeyboard --> interact.conversation.awaitCommand : removeKeyboard.OnDone
+    interact.hydration.restored --> interact.hydration.persisted : removeKeyboard.OnDone
+    interact.conversation.removeKeyboard --> interact.conversation.awaitCommand : removeKeyboard.OnError
+    interact.hydration.restored --> interact.hydration.persisted : removeKeyboard.OnError
+  }
+  --
+  interact.hydration : hydration
+  state interact.hydration {
+    [*] --> interact.hydration.persisted
+    interact.hydration.persisted : persisted
+    interact.hydration.persisted --> interact.hydration.restored : restore
+    interact.hydration.restored : restored
+  }
+}
+"
+`;
+
+exports[`Generate mermaid diagram parallel machine 1`] = `
+"stateDiagram-v2
+coffee : coffee
+state coffee {
+  [*] --> coffee.preparing
+  coffee.preparing : preparing
+  state coffee.preparing {
+    coffee.preparing.grindBeans : grindBeans
+    state coffee.preparing.grindBeans {
+      [*] --> coffee.preparing.grindBeans.grindingBeans
+      coffee.preparing.grindBeans.grindingBeans : grindingBeans
+      coffee.preparing.grindBeans.grindingBeans --> coffee.preparing.grindBeans.beansGround : BEANS_GROUND
+      coffee.preparing.grindBeans.beansGround : beansGround
+      coffee.preparing.grindBeans.beansGround --> [*]
+    }
+    --
+    coffee.preparing.boilWater : boilWater
+    state coffee.preparing.boilWater {
+      [*] --> coffee.preparing.boilWater.boilingWater
+      coffee.preparing.boilWater.boilingWater : boilingWater
+      coffee.preparing.boilWater.boilingWater --> coffee.preparing.boilWater.waterBoiled : WATER_BOILED
+      coffee.preparing.boilWater.waterBoiled : waterBoiled
+      coffee.preparing.boilWater.waterBoiled --> [*]
+    }
+  }
+  coffee.preparing --> coffee.makingCoffee : preparing.OnDone
+  coffee.makingCoffee : makingCoffee
+}
+"
+`;
+
+exports[`Generate mermaid diagram simple machine 1`] = `
+"stateDiagram-v2
+simple : simple
+state simple {
+  [*] --> simple.lightsOff
+  simple.lightsOn : lightsOn
+  simple.lightsOn --> simple.lightsOff : toggle
+  simple.lightsOff : lightsOff
+  simple.lightsOff --> simple.lightsOn : toggle
+}
+"
+`;
