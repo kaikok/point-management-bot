@@ -65,12 +65,16 @@ export function setupStateMachine(
                 src: "SendEmptyKeyboard",
                 onDone: [
                   {
-                    target: "awaitCommand",
+                    target: [
+                      "awaitCommand",
+                      "#interact.hydration.persisted"],
                   },
                 ],
                 onError: [
                   {
-                    target: "awaitCommand",
+                    target: [
+                      "awaitCommand",
+                      "#interact.hydration.persisted"],
                   },
                 ],
               },
