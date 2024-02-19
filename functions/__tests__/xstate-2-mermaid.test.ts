@@ -47,7 +47,6 @@ describe("Generate mermaid diagram", () => {
         guards: {},
         delays: {},
       });
-    console.log(generateMermaid(simple));
     expect(generateMermaid(simple)).toMatchSnapshot();
   });
 
@@ -97,7 +96,6 @@ describe("Generate mermaid diagram", () => {
         makingCoffee: {},
       },
     });
-
     expect(generateMermaid(parallel)).toMatchSnapshot();
   });
 });

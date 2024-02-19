@@ -40,75 +40,80 @@ export const getInitialState = (stateMachineNode: any) => {
   return stateMachineNode.states[stateMachineNode.config.initial];
 };
 
-export const recurseXStateNode = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stateMachineNode: any, rootStateId: string, identation: number) => {
-  let mermaidString = "";
-  const {id, type, transitions, parent, states} = stateMachineNode;
+// Mermaid generation routines
+const generateStateDeclaration = (
+  stringTokens: string[],
+  identation: number,
+  id: any,
+  key: any) => {
+  stringTokens.push(
+    "  ".repeat(identation) +
+    `${id} : ${key}\n`);
+};
 
-  if (rootStateId === id) {
-    mermaidString = mermaidString.concat("stateDiagram-v2\n");
-  }
+const generateCompositeStatePreamble = (
+  identation: number,
+  id: any, stateMachineNode: any) => {
+  const stringTokens: Array<string> = [];
+  stringTokens.push("  ".repeat(identation) +
+    `state ${id} {\n`);
+  stringTokens.push("  ".repeat(identation + 1) +
+    "[*] --> " +
+    `${getInitialState(stateMachineNode).id}\n`);
+  return stringTokens;
+};
 
-  mermaidString =
-    mermaidString.concat(
+const generateInternalState = (
+  stateMachineNode: any,
+  identation: number,
+  first: boolean) => {
+  return recurseXStateNode(stateMachineNode,
+    identation);
+};
+
+const generateConcurrentState = (
+  stateMachineNode: any,
+  identation: number,
+  first: boolean) => {
+  let stringTokens: Array<string> = [];
+  if (!first) {
+    stringTokens.push(
       "  ".repeat(identation) +
-      `${id} : ${stateMachineNode.key}\n`);
+      "--\n");
+  }
+  stringTokens = stringTokens.concat(
+    recurseXStateNode(stateMachineNode,
+      identation));
+  return stringTokens;
+};
 
-  if (type === "compound") {
-    mermaidString =
-      mermaidString.concat("  ".repeat(identation) +
-        `state ${id} {\n`);
-    mermaidString =
-      mermaidString.concat("  ".repeat(identation + 1) +
-        "[*] --> " +
-        `${getInitialState(stateMachineNode).id}\n`);
-    if (states) {
-      const stateName = Object.keys(states);
-      for (const idx in stateName) {
-        if (Object.prototype.hasOwnProperty.call(
-          stateName, idx)) {
-          mermaidString =
-            mermaidString.concat(
-              recurseXStateNode(states[stateName[idx]],
-                rootStateId,
-                identation + 1));
+const enumerateXStateSubStates = (
+  states: { [x: string]: any; },
+  identation: number,
+  enumerator:
+    (stateMachineNode: any, identation: number, first: boolean)
+    => Array<string>) => {
+  let stringTokens: Array<string> = [];
+  let first = true;
+  if (states) {
+    const stateName = Object.keys(states);
+    for (const idx in stateName) {
+      if (Object.prototype.hasOwnProperty.call(
+        stateName, idx)) {
+        stringTokens = stringTokens.concat(
+          enumerator(states[stateName[idx]], identation + 1, first));
+        if (first) {
+          first = false;
         }
       }
     }
-    mermaidString =
-      mermaidString.concat("  ".repeat(identation) + "}\n");
   }
+  return stringTokens;
+};
 
-  if (type === "parallel") {
-    mermaidString =
-      mermaidString.concat("  ".repeat(identation) +
-        `state ${id} {\n`);
-    if (states) {
-      const stateName = Object.keys(states);
-      let first = true;
-      for (const idx in stateName) {
-        if (Object.prototype.hasOwnProperty.call(
-          stateName, idx)) {
-          if (first) {
-            first = false;
-          } else {
-            mermaidString = mermaidString.concat(
-              "  ".repeat(identation + 1) +
-              "--\n");
-          }
-          mermaidString =
-            mermaidString.concat(
-              recurseXStateNode(states[stateName[idx]],
-                rootStateId,
-                identation + 1));
-        }
-      }
-    }
-    mermaidString =
-      mermaidString.concat("  ".repeat(identation) + "}\n");
-  }
-
+const enumerateXStateTransitions = (
+  transitions: any, parent: any, identation: number, id: any) => {
+  const stringTokens: Array<string> = [];
   for (const [eventName, transition] of transitions) {
     const targets = transition[0].target;
     const guard = transition[0].guard;
@@ -118,12 +123,11 @@ export const recurseXStateNode = (
         const srcParentId = parent.id;
         const targetParentId = targets[idx].parent.id;
         if (srcParentId === targetParentId) {
-          mermaidString =
-            mermaidString.concat(
-              "  ".repeat(identation) +
-              `${id} --> ${targets[idx].id} :` +
-              ` ${transformEventLabel(eventName)}` +
-              `${guard ? "/" + guard : ""}\n`);
+          stringTokens.push(
+            "  ".repeat(identation) +
+            `${id} --> ${targets[idx].id} :` +
+            ` ${transformEventLabel(eventName)}` +
+            `${guard ? "/" + guard : ""}\n`);
         } else {
           const siblingStates = targets[idx].parent.states;
           if (siblingStates) {
@@ -132,13 +136,12 @@ export const recurseXStateNode = (
               if (Object.prototype.hasOwnProperty.call(
                 stateName, stateIdx)) {
                 if (targets[idx].id !== siblingStates[stateName[stateIdx]].id) {
-                  mermaidString =
-                    mermaidString.concat(
-                      "  ".repeat(identation) +
-                      `${siblingStates[stateName[stateIdx]].id} -->` +
-                      ` ${targets[idx].id} :` +
-                      ` ${transformEventLabel(eventName)}` +
-                      `${guard ? "/" + guard : ""}\n`);
+                  stringTokens.push(
+                    "  ".repeat(identation) +
+                    `${siblingStates[stateName[stateIdx]].id} -->` +
+                    ` ${targets[idx].id} :` +
+                    ` ${transformEventLabel(eventName)}` +
+                    `${guard ? "/" + guard : ""}\n`);
                 }
               }
             }
@@ -147,19 +150,93 @@ export const recurseXStateNode = (
       }
     }
   }
+  return stringTokens;
+};
 
-  if (type === "final") {
-    mermaidString =
-      mermaidString.concat(
-        "  ".repeat(identation) +
-        `${id} --> [*]\n`);
+export const recurseXStateNode = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stateMachineNode: any, identation: number) => {
+  let stringTokens: Array<string> = [];
+  const {id, type, transitions, parent, states} = stateMachineNode;
+
+  generateStateDeclaration(
+    stringTokens,
+    identation,
+    id,
+    stateMachineNode.key);
+
+  if (type === "compound") {
+    stringTokens = stringTokens.concat(
+      generateCompositeStatePreamble(identation, id, stateMachineNode));
+
+    stringTokens = stringTokens.concat(
+      enumerateXStateSubStates(states, identation, generateInternalState));
+    stringTokens.push("  ".repeat(identation) + "}\n");
   }
 
-  return mermaidString;
+  if (type === "parallel") {
+    stringTokens.push("  ".repeat(identation) +
+        `state ${id} {\n`);
+    stringTokens = stringTokens.concat(
+      enumerateXStateSubStates(states, identation, generateConcurrentState));
+    stringTokens.push("  ".repeat(identation) + "}\n");
+  }
+
+  // for (const [eventName, transition] of transitions) {
+  //   const targets = transition[0].target;
+  //   const guard = transition[0].guard;
+
+  //   for (const idx in targets) {
+  //     if (Object.prototype.hasOwnProperty.call(targets, idx)) {
+  //       const srcParentId = parent.id;
+  //       const targetParentId = targets[idx].parent.id;
+  //       if (srcParentId === targetParentId) {
+  //         stringTokens.push(
+  //           "  ".repeat(identation) +
+  //           `${id} --> ${targets[idx].id} :` +
+  //           ` ${transformEventLabel(eventName)}` +
+  //           `${guard ? "/" + guard : ""}\n`);
+  //       } else {
+  //         const siblingStates = targets[idx].parent.states;
+  //         if (siblingStates) {
+  //           const stateName = Object.keys(siblingStates);
+  //           for (const stateIdx in stateName) {
+  //             if (Object.prototype.hasOwnProperty.call(
+  //               stateName, stateIdx)) {
+  //               if (targets[idx].id !== siblingStates[stateName[stateIdx]].id) {
+  //                 stringTokens.push(
+  //                   "  ".repeat(identation) +
+  //                   `${siblingStates[stateName[stateIdx]].id} -->` +
+  //                   ` ${targets[idx].id} :` +
+  //                   ` ${transformEventLabel(eventName)}` +
+  //                   `${guard ? "/" + guard : ""}\n`);
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+  stringTokens = stringTokens.concat(
+    enumerateXStateTransitions(transitions, parent, identation, id));
+
+  if (type === "final") {
+    stringTokens.push(
+      "  ".repeat(identation) +
+      `${id} --> [*]\n`);
+  }
+
+  // console.log(stringTokens);
+  return stringTokens;
 };
 
 export const generateMermaid = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   stateMachine: any) => {
-  return recurseXStateNode(stateMachine.root, stateMachine.root.config.id, 0);
+  let stringTokens : Array<string> = [];
+  stringTokens.push("stateDiagram-v2\n");
+  stringTokens = stringTokens.concat(
+    recurseXStateNode(stateMachine.root, 0));
+  return stringTokens.join("");
 };
