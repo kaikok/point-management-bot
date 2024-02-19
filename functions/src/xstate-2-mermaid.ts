@@ -31,21 +31,55 @@ const eventLabelTransformers = [
   },
 ];
 
-export const transformXStateEventLabel = (label: string) => {
-  let transformed = label;
-  eventLabelTransformers.forEach((transformer) => {
-    if (transformer.active) {
-      const replaced = label.replace(
-        transformer.pattern, transformer.replacement);
-      if (replaced !== label) {
-        transformed = replaced;
-      }
-    }
-  });
-  return transformed;
+export const generateMermaid = (
+  stateMachine: any) => {
+  let stringTokens : Array<string> = [];
+  stringTokens.push("stateDiagram-v2\n");
+  stringTokens = stringTokens.concat(
+    visitXStateNode(stateMachine.root, 0));
+  return stringTokens.join("");
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const visitXStateNode = (
+  stateMachineNode: any, identation: number): Array<string> => {
+  let stringTokens: Array<string> = [];
+  const {id: currentId, type, transitions, parent, states} = stateMachineNode;
+
+  stringTokens = stringTokens.concat(
+    generateStateDeclaration(
+      identation, currentId, stateMachineNode.key));
+
+  if (type === "compound") {
+    stringTokens = stringTokens.concat(
+      generateCompositeState(
+        currentId,
+        getXStateInitialState(stateMachineNode).id,
+        identation,
+        forEachXStateSubStates(
+          states, identation, generateInternalState, visitXStateNode)));
+  }
+
+  if (type === "parallel") {
+    stringTokens = stringTokens.concat(
+      generateConcurrentStates(
+        currentId,
+        identation,
+        forEachXStateSubStates(
+          states, identation, generateEachConcurrentState, visitXStateNode)));
+  }
+
+  stringTokens = stringTokens.concat(
+    forEachXStateTransitions(
+      transitions, parent, identation, currentId, generateTransition));
+
+  if (type === "final") {
+    stringTokens = stringTokens.concat(
+      generateTransitionToFinal(identation, currentId));
+  }
+
+  return stringTokens;
+};
+
 export const getXStateInitialState = (stateMachineNode: any) => {
   return stateMachineNode.states[stateMachineNode.config.initial];
 };
@@ -72,38 +106,6 @@ const forEachXStateSubStates = (
             states[stateName[idx]], identation + 1, first, visitNodeFn));
         if (first) {
           first = false;
-        }
-      }
-    }
-  }
-  return stringTokens;
-};
-
-const forEachXStateSiblingState = (
-  siblingStates: any,
-  currentState: any,
-  identation: number,
-  eventName: string,
-  guard: string,
-  callbackFn: (
-    currentStateId: string,
-    targetStateId: string,
-    identation: number,
-    eventName: string,
-    guard: string) => Array<string>) => {
-  let stringTokens: Array<string> = [];
-  if (siblingStates) {
-    const stateName = Object.keys(siblingStates);
-    for (const stateIdx in stateName) {
-      if (Object.prototype.hasOwnProperty.call(
-        stateName, stateIdx)) {
-        if (currentState.id !== siblingStates[stateName[stateIdx]].id) {
-          stringTokens = stringTokens.concat(callbackFn(
-            siblingStates[stateName[stateIdx]].id,
-            currentState.id,
-            identation,
-            transformXStateEventLabel(eventName),
-            guard ? guard : ""));
         }
       }
     }
@@ -151,51 +153,48 @@ const forEachXStateTransitions = (
   return stringTokens;
 };
 
-export const visitXStateNode = (
-  stateMachineNode: any, identation: number): Array<string> => {
-  let stringTokens: Array<string> = [];
-  const {id: currentId, type, transitions, parent, states} = stateMachineNode;
-
-  stringTokens = stringTokens.concat(
-    generateStateDeclaration(
-      identation, currentId, stateMachineNode.key));
-
-  if (type === "compound") {
-    stringTokens = stringTokens.concat(
-      generateCompositeState(
-        currentId,
-        getXStateInitialState(stateMachineNode).id,
-        identation,
-        forEachXStateSubStates(
-          states, identation, generateInternalState, visitXStateNode)));
-  }
-
-  if (type === "parallel") {
-    stringTokens = stringTokens.concat(
-      generateConcurrentStates(
-        currentId,
-        identation,
-        forEachXStateSubStates(
-          states, identation, generateEachConcurrentState, visitXStateNode)));
-  }
-
-  stringTokens = stringTokens.concat(
-    forEachXStateTransitions(
-      transitions, parent, identation, currentId, generateTransition));
-
-  if (type === "final") {
-    stringTokens = stringTokens.concat(
-      generateTransitionToFinal(identation, currentId));
-  }
-
-  return stringTokens;
+export const transformXStateEventLabel = (label: string) => {
+  let transformed = label;
+  eventLabelTransformers.forEach((transformer) => {
+    if (transformer.active) {
+      const replaced = label.replace(
+        transformer.pattern, transformer.replacement);
+      if (replaced !== label) {
+        transformed = replaced;
+      }
+    }
+  });
+  return transformed;
 };
 
-export const generateMermaid = (
-  stateMachine: any) => {
-  let stringTokens : Array<string> = [];
-  stringTokens.push("stateDiagram-v2\n");
-  stringTokens = stringTokens.concat(
-    visitXStateNode(stateMachine.root, 0));
-  return stringTokens.join("");
+const forEachXStateSiblingState = (
+  siblingStates: any,
+  currentState: any,
+  identation: number,
+  eventName: string,
+  guard: string,
+  callbackFn: (
+    currentStateId: string,
+    targetStateId: string,
+    identation: number,
+    eventName: string,
+    guard: string) => Array<string>) => {
+  let stringTokens: Array<string> = [];
+  if (siblingStates) {
+    const stateName = Object.keys(siblingStates);
+    for (const stateIdx in stateName) {
+      if (Object.prototype.hasOwnProperty.call(
+        stateName, stateIdx)) {
+        if (currentState.id !== siblingStates[stateName[stateIdx]].id) {
+          stringTokens = stringTokens.concat(callbackFn(
+            siblingStates[stateName[stateIdx]].id,
+            currentState.id,
+            identation,
+            transformXStateEventLabel(eventName),
+            guard ? guard : ""));
+        }
+      }
+    }
+  }
+  return stringTokens;
 };
