@@ -41,7 +41,7 @@ export const getXStateInitialState = (stateMachineNode: any) => {
 };
 
 // Mermaid generation routines
-const generateStateDeclaration = (
+export const generateStateDeclaration = (
   identation: number,
   id: string,
   key: string) => {
@@ -52,7 +52,7 @@ const generateStateDeclaration = (
   return stringTokens;
 };
 
-const generateTransitionToFinal = (
+export const generateTransitionToFinal = (
   identation: number,
   id: string) => {
   const stringTokens: Array<string> = [];
@@ -62,75 +62,43 @@ const generateTransitionToFinal = (
   return stringTokens;
 };
 
-const generateCompositeState = (
-  states: { [x: string]: any; },
-  identation: number,
-  id: any,
+export const generateCompositeState = (
+  currentId: string,
   initialStateId: string,
-  forEachSubState: (
-    states: any,
-    identation: number,
-    callbackFn:
-      (stateMachineNode: any, identation: number, first: boolean,
-        visitNodeFn:
-          (stateMachineNode: any, identation: number) => Array<string>)
-      => Array<string>,
-      visitNodeFn:
-        (stateMachineNode: any, identation: number)
-        => Array<string>) => Array<string>,
-  visitNodeFn:
-    (stateMachineNode: any, identation: number) => Array<string>):
-    Array<string> => {
+  identation: number,
+  internalStateStringTokens: Array<string>
+): Array<string> => {
   let stringTokens: Array<string> = [];
   stringTokens.push("  ".repeat(identation) +
-    `state ${id} {\n`);
-
+  `state ${currentId} {\n`);
   stringTokens.push("  ".repeat(identation + 1) +
     "[*] --> " +
     `${initialStateId}\n`);
-
-  stringTokens = stringTokens.concat(
-    forEachSubState(states, identation, generateInternalState, visitNodeFn));
-
+  stringTokens = stringTokens.concat(internalStateStringTokens);
   stringTokens.push("  ".repeat(identation) + "}\n");
   return stringTokens;
 };
 
-const generateInternalState = (
+export const generateInternalState = (
   stateMachineNode: any,
   identation: number,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  first: boolean) => {
-  return visitXStateNode(stateMachineNode,
+  first: boolean,
+  visitNodeFn:
+    (stateMachineNode: any, identation: number) => Array<string>) => {
+  return visitNodeFn(stateMachineNode,
     identation);
 };
 
-const generateConcurrentStates = (
-  states: any,
+export const generateConcurrentStates = (
+  currentId: string,
   identation: number,
-  id: any,
-  forEachSubState: (
-    states: any,
-    identation: number,
-    callbackFn:
-      (stateMachineNode: any, identation: number, first: boolean,
-        visitNodeFn:
-          (stateMachineNode: any, identation: number) => Array<string>)
-      => Array<string>,
-      visitNodeFn:
-        (stateMachineNode: any, identation: number)
-        => Array<string>) => Array<string>,
-  visitNodeFn:
-    (stateMachineNode: any, identation: number) => Array<string>):
-    Array<string> => {
+  internalStateStringTokens: Array<string>
+): Array<string> => {
   let stringTokens: Array<string> = [];
   stringTokens.push("  ".repeat(identation) +
-      `state ${id} {\n`);
-
-  stringTokens = stringTokens.concat(
-    forEachSubState(
-      states, identation, generateEachConcurrentState, visitNodeFn));
-
+    `state ${currentId} {\n`);
+  stringTokens = stringTokens.concat(internalStateStringTokens);
   stringTokens.push("  ".repeat(identation) + "}\n");
   return stringTokens;
 };
@@ -279,16 +247,20 @@ export const visitXStateNode = (
   if (type === "compound") {
     stringTokens = stringTokens.concat(
       generateCompositeState(
-        states, identation, currentId,
+        currentId,
         getXStateInitialState(stateMachineNode).id,
-        forEachXStateSubStates, visitXStateNode));
+        identation,
+        forEachXStateSubStates(
+          states, identation, generateInternalState, visitXStateNode)));
   }
 
   if (type === "parallel") {
     stringTokens = stringTokens.concat(
       generateConcurrentStates(
-        states, identation, currentId,
-        forEachXStateSubStates, visitXStateNode));
+        currentId,
+        identation,
+        forEachXStateSubStates(
+          states, identation, generateEachConcurrentState, visitXStateNode)));
   }
 
   stringTokens = stringTokens.concat(
