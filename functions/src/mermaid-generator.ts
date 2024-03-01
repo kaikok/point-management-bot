@@ -1,3 +1,13 @@
+import {visitXStateNode} from "./xstate-traversal";
+
+export const generateMermaidFromXState = (
+  stateMachine: any) => {
+  let stringTokens: Array<string> = [];
+  stringTokens.push("stateDiagram-v2\n");
+  stringTokens = stringTokens.concat(
+    visitXStateNode(stateMachine.root, 0));
+  return stringTokens.join("");
+};
 
 export const generateStateDeclaration = (
   identation: number,

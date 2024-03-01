@@ -31,15 +31,6 @@ const eventLabelTransformers = [
   },
 ];
 
-export const generateMermaid = (
-  stateMachine: any) => {
-  let stringTokens : Array<string> = [];
-  stringTokens.push("stateDiagram-v2\n");
-  stringTokens = stringTokens.concat(
-    visitXStateNode(stateMachine.root, 0));
-  return stringTokens.join("");
-};
-
 export const visitXStateNode = (
   stateMachineNode: any, identation: number): Array<string> => {
   let stringTokens: Array<string> = [];

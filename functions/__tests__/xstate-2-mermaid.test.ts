@@ -2,7 +2,7 @@ jest.mock("telegraf");
 import {Telegraf} from "telegraf";
 import {setupStateMachine} from "../src/interaction";
 import {ReplyKeyboardRemove} from "telegraf/typings/core/types/typegram";
-import {generateMermaid} from "../src/xstate-2-mermaid";
+import { generateMermaidFromXState } from "../src/mermaid-generator";
 import {createMachine} from "xstate";
 
 const removeKeyboard : ReplyKeyboardRemove= {
@@ -16,7 +16,7 @@ describe("Generate mermaid diagram", () => {
       telegram: {webhookReply: true},
     });
     const eventViewingMachine = setupStateMachine(bot, removeKeyboard);
-    expect(generateMermaid(eventViewingMachine)).toMatchSnapshot();
+    expect(generateMermaidFromXState(eventViewingMachine)).toMatchSnapshot();
   });
 
   test.only("simple machine", async () => {
@@ -47,7 +47,7 @@ describe("Generate mermaid diagram", () => {
         guards: {},
         delays: {},
       });
-    expect(generateMermaid(simple)).toMatchSnapshot();
+    expect(generateMermaidFromXState(simple)).toMatchSnapshot();
   });
 
   test.only("parallel machine", async () => {
@@ -96,6 +96,6 @@ describe("Generate mermaid diagram", () => {
         makingCoffee: {},
       },
     });
-    expect(generateMermaid(parallel)).toMatchSnapshot();
+    expect(generateMermaidFromXState(parallel)).toMatchSnapshot();
   });
 });
