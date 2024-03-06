@@ -24,6 +24,7 @@
     "firebase-admin": "^11.5.0",
     "firebase-functions": "^4.6.0",
     "firestore-jest-mock": "^0.23.0",
+    "fsm2mermaid": "^1.1.0",
     "morgan-body": "^2.6.9",
     "telegraf": "^4.15.3",
     "xstate": "^5.6.0"
